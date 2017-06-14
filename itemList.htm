@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>本地列表</title>
+	<!-- Bootstrap -->
+	<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+	<link href="Zebra_Dialog-master/public/css/default/zebra_dialog.css" rel="stylesheet">
+	<script src="js/jquery.min.js"></script>
+	<script src="js/clipboard.js"></script>
+	<script src="Zebra_Dialog-master/public/javascript/zebra_dialog.js"></script>
+	<script src="js/common.js"></script>
+	<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+	<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+	<!--[if lt IE 9]>
+      <script src="http://cdn.bootcss.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="http://cdn.bootcss.com/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+	<link rel="stylesheet" href="css/itemlist.css">
+</head>
+
+<body>
+	<div class="container-fluid navbar-fixed-top">
+		<div class="panel panel-info">
+			<div class="panel-heading ">
+				<div class="btn-toolbar">
+					<div class="btn-group">
+						<button type="button" class="btn btn btn-info -add">添加</button>
+						<button type="button" class="btn btn btn-info -refresh" role="refresh">刷新</button>
+						<button type="button" class="btn btn btn-info -setup">设置</button>
+						<button type="button" class="btn btn btn-info -deleteAll">删除全部</button>
+					</div>
+					<div class="btn-group">
+						<button type="button" class="btn btn btn-info">自动发本页</button>
+						<button type="button" class="btn btn btn-danger" role="refresh">停止发送</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div id="itemlist">
+		<div style="height:60px;"></div>
+		<div class="container-fluid">
+			<div class="row center-block">
+
+			</div>
+		</div>
+	</div>
+	<div class="container-fluid">
+		<div style="padding:5px;height:40px;text-align:center;color: #fff;background-color: #428bca;border-color: #357ebd;font-size:20px;cursor: pointer;border-radius: 4px;" class="-loadmore">加载更多</div>
+	</div>
+</body>
+<script src="bootstrap/js/bootstrap.min.js"></script>
+<script src="js/itemlist.js"></script>
+<script src="/js/jquery.lazyload.js"></script>
+</html>

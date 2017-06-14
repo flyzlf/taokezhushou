@@ -1,0 +1,169 @@
+{
+	"name": "爬虫机器人",
+	"version": "2.1",
+	"icons": {
+		"16": "Spider.png",
+		"48": "Spider.png",
+		"128": "Spider.png"
+	},
+	"manifest_version": 2,
+	"description": "从各淘客网站抓取内容更新到自己的网站",
+	"browser_action": {
+		"default_title": "爬虫机器人",
+		"default_icon": "Spider.png",
+		"default_popup": "popPage.htm"
+	},
+	"background": {
+		"scripts": [
+			"js/jquery.min.js",
+			"js/localitemlist.js",
+			"js/background.js"
+		]
+	},
+	"content_scripts": [
+		{
+			"matches": [
+				"*://*.shihuizhu.com/*",
+				"*://*.shihuizhu.net/*"
+			],
+			"js": [
+				"js/jquery.min.js",
+				"js/common.js",
+				"js/shihuizhu.js",
+				"Zebra_Dialog-master/public/javascript/zebra_dialog.js",
+				"js/clipboard.js"
+			],
+			"css": [
+				"Zebra_Dialog-master/public/css/default/zebra_dialog.css"
+			],
+			"all_frames": false
+		},
+		{
+			"matches": [
+				"*://*.taokezhushou.com/*"
+			],
+			"js": [
+				"js/jquery.min.js",
+				"js/common.js",
+				"js/taokezhushou.js",
+				"Zebra_Dialog-master/public/javascript/zebra_dialog.js",
+				"js/clipboard.js"
+			],
+			"css": [
+				"Zebra_Dialog-master/public/css/default/zebra_dialog.css"
+			],
+			"all_frames": false
+		},
+		{
+			"matches": [
+				"*://*.dataoke.com/quan_list/*",
+				"*://*.dataoke.com/q_top/*"
+			],
+			"js": [
+				"js/jquery.min.js",
+				"js/common.js",
+				"js/dataoke.js",
+				"Zebra_Dialog-master/public/javascript/zebra_dialog.js",
+				"js/clipboard.js"
+			],
+			"css": [
+				"Zebra_Dialog-master/public/css/default/zebra_dialog.css"
+			],
+			"all_frames": false
+		},
+		{
+			"matches": [
+				"*://*.dataoke.com/qlist/*",
+				"*://*.dataoke.com/search/*"
+			],
+			"js": [
+				"js/jquery.min.js",
+				"js/common.js",
+				"js/dataoke_new.js",
+				"Zebra_Dialog-master/public/javascript/zebra_dialog.js",
+				"js/clipboard.js"
+			],
+			"css": [
+				"Zebra_Dialog-master/public/css/default/zebra_dialog.css"
+			],
+			"all_frames": false
+		},
+		{
+			"matches": [
+				"*://*.alimama.com/*"
+			],
+			"js": [
+				"js/jquery.min.js",
+				"js/common.js",
+				"js/alimama.js"
+			],
+			"css": [
+				
+			],
+			"all_frames": false
+		},
+		{
+			"matches": [
+				"*://w.qq.com/*"
+			],
+			"js": [
+				"js/jquery.min.js",
+				"js/common.js",
+				"Zebra_Dialog-master/public/javascript/zebra_dialog.js",
+				"js/clipboard.js",
+				"js/qq.js"
+			],
+			"css": [
+				"Zebra_Dialog-master/public/css/default/zebra_dialog.css"
+			],
+			"all_frames": false
+		},
+		{
+			"matches": [
+					"*://*.taobao.com/*",
+					"*://item.taobao.com/*",
+							"*://world.taobao.com/*",
+							"*://detail.tmall.com/*",
+							"*://world.tmall.com/*",
+							"*://detail.ju.taobao.com/*",
+							"*://detail.yao.95095.com/*",
+					"*://shop.m.taobao.com/*",
+							"*://chaoshi.detail.tmall.com/*",
+							"*://detail.tmall.hk/*",
+							"*://items.alitrip.com/*",
+							"*://hotel.alitrip.com/*",
+							"*://item.alitrip.com/*",
+							"*://detail.alitrip.com/*",
+					"*://detail.alitrip.hk/*",
+							"*://taoquan.taobao.com/*",
+					"*://tuan.alitrip.com/*"
+				],
+				"js": [
+					"js/jquery.min.js",
+					"js/common.js",
+					"js/tmalltaobao.js"
+				],
+				"css": [
+					
+				],
+				"all_frames": true
+			}
+	],
+	"permissions": [
+		"http://*/*",
+		"https://*/*",
+		"tabs",
+		"cookies",
+		"clipboardRead",
+		"clipboardWrite",
+		"webRequestBlocking",
+		"webRequest"
+	],
+	"web_accessible_resources": [
+		"js/*",
+		"css/*",
+		"css/images/*",
+		"images/*",
+		"Zebra_Dialog-master/public/css/default/*"
+	]
+}
