@@ -7,11 +7,14 @@ var promiseList={
 	reject:function(index,msg){
 		return index>=this.promises.length?null:this.promises[index].reject(msg);
 	},
+	state:function(index){
+		return this.promises[index]?this.promises[index].state():null;
+	},
 	resolve:function(index,msg){
 		return index>=this.promises.length?null:this.promises[index].resolve(msg);
 	},
 	add:function(promise_){
-		return this.promises.push($.Deferred())-1;
+		return promise_?this.promises.push(promise_)-1:this.promises.push($.Deferred())-1;
 	},
 	delete:function(index){
 		index>=this.promises.length?null:this.promises[index]=null;
@@ -29,7 +32,7 @@ var _COMMON=function(_param){
 		chrome.runtime.sendMessage(msg, function(response){
 			def.resolve(response);
 		});
-		return def;
+		return def.promise();
 	};
 	this.regmytab=function(){//向后台注册tab
 		var msg={
@@ -51,13 +54,23 @@ var _COMMON=function(_param){
 			adzoneid:'',
 			siteid:'',
 			_tb_token_:'',
-			setup_tail:''
+			setup_tail:'',
+			setup_isautosave:0,
+			setup_isautosendqq:0,
+			setup_yjfloorlimit:0,
+			setup_sendlisttimeout:12,
+			setup_afterpastedelay:0.5
 		}
-		return that.sendToBackground({action:'getData',data:_info})
+		var _def=$.Deferred();
+		that.sendToBackground({action:'getData',data:_info})
 		.then(function(info){
+			itemObj=itemObj||{};
 			$.extend(itemObj,info);
-			return itemObj;
+			_def.resolve(itemObj);
+		},function(err){
+			_def.reject(err);
 		})
+		return _def.promise();
 	};
 	this.saveDataToBack=function(data){
 		return this.sendToBackground({action:'saveData',data:data});
@@ -83,6 +96,84 @@ var _COMMON=function(_param){
 	this.saveItemObjToback=function(itemObj){//保存item到本地
 		return that.sendToBackground({action:'item_put',val:itemObj})
 		.then(function(re){return itemObj})
+	};
+	this.localStorage={
+		get:function(item){
+			var val=localStorage.getItem(item);
+			return val?JSON.parse(localStorage.getItem(item)):val;
+		},
+		set:function(key,val){
+			val=val?JSON.stringify(val):val;
+			localStorage.setItem(key,val);
+		}
+	}
+	this.sendRecordList_server={
+		getAll:function(){
+			return that.sendToBackground({action:'getData',data:{sendList:{}}})
+		},
+		put:function(gid){
+			return this.getAll()
+			.then(function(list){
+				list=list.sendList||{};
+				list[gid]=new Date().getTime();
+				return that.sendToBackground({action:'saveData',data:{sendList:list}});
+			});
+		},
+		get:function(gid){
+			return this.getAll()
+			.then(function(list){
+				list=list.sendList||{};
+				return list[gid];
+			});
+		},
+		exist:function(gid,timeout){
+			timeout=timeout||24;
+			return this.get(gid)
+			.then(function(re){
+				return re?new Date().getTime()-re<timeout*60*60*1000:false;//默认24小时后失效
+			})
+		},
+		del:function(gid){
+			return this.getAll()
+			.then(function(list){
+				list=list.sendList||{};
+				delete list[gid];
+				return that.sendToBackground({action:'saveData',data:{sendList:list}});
+			});			
+		},
+		clear:function(){
+			return that.sendToBackground({action:'saveData',data:{sendList:{cleardate:new Date().getTime()}}});
+		}
+	}
+	this.sendRecordList={//发送记录列表
+		exist:function(gid,timeout){
+			timeout=timeout||24;
+			var list=that.localStorage.get("sendList")||{};
+			return list[gid]?new Date().getTime()-list[gid]<timeout*60*60*1000:false;//24小时后失效
+		},
+		getAll:function(){
+			var list=that.localStorage.get("sendList")||{};
+			return list;
+		},
+		get:function(gid){
+			var list=that.localStorage.get("sendList")||{};
+			return list[gid];
+		},
+		put:function(gid){
+			var list=that.localStorage.get("sendList")||{};
+			list[gid]=new Date().getTime();
+			that.localStorage.set("sendList",list);
+		},
+		del:function(gid){
+			var list=that.localStorage.get("sendList")||{};
+			if(list[gid]){
+				delete list[gid];
+				that.localStorage.set("sendList",list);
+			}
+		},
+		clear:function(){
+			that.localStorage.set("sendList",{cleardate:new Date().getTime()});
+		}
 	}
 };
 _COMMON.prototype.addMessageListener=function(){//监听后台发来的消息
@@ -101,6 +192,9 @@ _COMMON.prototype.addMessageListener=function(){//监听后台发来的消息
 					eval(message.func);//执行字符串
 					reFunc("ok");
 				}
+				break;
+			case 'getRealurl_notify':
+				getRealurl_notify(message,reFunc);
 				break;
 			default:
 				reFunc("whatuwant?");
@@ -160,12 +254,13 @@ _COMMON.prototype.savetoweb=function(data,callback){
 _COMMON.prototype.checkValidity_coupon=function(itemObj){//检查优惠卷有效性
 	if(!itemObj.couponurl)//没有地址
 		return itemObj;
+	return itemObj;//放弃检查
 	console.log("正在检查优惠券有效性...");
 	var haveReg = new RegExp("已领用|确认领取");
 	return $.get(itemObj.couponurl)
 	.fail(function(){return $.Deferred().reject({msg:"出错了..."})})
 	.then(function(re){
-		var coupon=/(\d+)元优惠券/.exec(re);
+		var coupon=/￥(\d+)/.exec(re);
 		if(coupon){
 			if(Number(itemObj.coupon)>0&&Number(coupon[1])!=Number(itemObj.coupon)){
 				console.warn("优惠券与实际不一致   %d!=%d",Number(coupon[1]),Number(itemObj.coupon));
@@ -186,10 +281,6 @@ _COMMON.prototype.getCommonCampaign=function(itemObj){//获得定向计划列表
 		return itemObj;
 	console.log("获取定向列表...");
 	return $.getJSON("http://pub.alimama.com/pubauc/getCommonCampaignByItemId.json",{itemId:itemObj.gid,_tb_token_:itemObj._tb_token,pvid:itemObj.pvid,t:new Date().getTime()})
-	.fail(function(){
-		console.log("请登录阿里妈妈...");
-		alert("请登录阿里妈妈...");
-	})
 	.then(function(json){
 		console.log(json);
 		if(!(json.data instanceof Array)){//没有计划列表
@@ -202,6 +293,10 @@ _COMMON.prototype.getCommonCampaign=function(itemObj){//获得定向计划列表
 			return b.commissionRate-a.commissionRate;
 		});
 		return itemObj;
+	},function(){
+		console.log("请登录阿里妈妈...");
+		alert("请登录阿里妈妈...");
+		return $.Deferred().reject({msg:"请登录阿里妈妈"});
 	})
 };
 _COMMON.prototype.applyForCommonCampaign=function(itemObj){//申请定向计划
@@ -291,7 +386,7 @@ _COMMON.prototype._isinDxlist=function(itemObj){
 		campaignId:itemObj.rate.dx.use.CampaignID,
 		shopkeeperId:itemObj.rate.dx.use.ShopKeeperID,
 		tab:2,
-		toPage:itemObj.toPage,
+		toPage:itemObj.toPage||1,
 		omid:itemObj.oriMemberid,
 		perPagesize:10,
 		t:new Date().getTime(),
@@ -299,11 +394,13 @@ _COMMON.prototype._isinDxlist=function(itemObj){
 		_tb_token_:itemObj._tb_token_,
 		_input_charset:'utf-8'		
 	}
+	console.log("请求第"+_param.toPage+"页...");
 	return $.getJSON("http://pub.alimama.com/campaign/merchandiseDetail.json",_param)
 	.then(function(json){
 		if(json.ok){
 			var isfind=false;
 			var gid=Number(itemObj.gid);
+			json.data.pagelist=json.data.pagelist||[];
 			$.each(json.data.pagelist,function(i,v){
 				if(v.auctionId==gid&&v.commissionRatePercent>=itemObj.rate.dx.use.commissionRate){//找到了
 					console.log("第"+json.data.paginator.page+"页中有此商品...");
@@ -318,9 +415,13 @@ _COMMON.prototype._isinDxlist=function(itemObj){
 				itemObj.rate.dx.use=null;
 				return itemObj;
 			}
+			else if(itemObj.toPage==json.data.paginator.nextPage){
+				console.log("死循环...列表中没有此商品...");
+				itemObj.rate.dx.use=null;
+				return itemObj;				
+			}
 			else{
 				itemObj.toPage=json.data.paginator.nextPage;//请求下一页
-				console.log("请求第"+json.data.paginator.nextPage+"页...");
 				return that._isinDxlist(itemObj);
 			}
 		}
@@ -358,7 +459,7 @@ _COMMON.prototype.getRate=function(itemObj){//返回佣金
 		var gy=itemObj.rate.gy.data.pageList?itemObj.rate.gy.data.pageList[0].eventRate:0;
 		var pt=itemObj.rate.pt.data.pageList?itemObj.rate.pt.data.pageList[0].tkRate:0;	
 		if(gy==0&&pt==0)
-			return $.Deferred().reject({msg:"没有找到此商品",show:'alert'});
+			return $.Deferred().reject({msg:"没有找到此商品",show:'console'});
 		if((gy>=itemObj.yj||pt>=itemObj.yj)&&itemObj>0)//如果普通佣金或鹊桥佣金大于等于网站显示的佣金则返回
 			return itemObj;
 		itemObj.rate.dx={};//否则申请定向计划
@@ -386,8 +487,10 @@ _COMMON.prototype.getAuctionCode=function(itemObj){
 }
 _COMMON.prototype.showCopyDialog=function(itemObj){//显示对话框
 	var that=this;
-	itemObj.redescribe=itemObj.describe.replace("AAcouponurlAA",itemObj.couponurl).replace("AAitemurlAA",itemObj.auctionCode.data.shortLinkUrl);
+	itemObj.redescribe=itemObj.describe.replace("AAcouponurlAA",itemObj.couponurl)
+	.replace("AAitemurlAA",itemObj.auctionCode.data.shortLinkUrl);
 	if(itemObj.redescribe.indexOf(itemObj.auctionCode.data.shortLinkUrl)==-1){
+		console.log(itemObj);
 		return $.Deferred().reject({msg:"网址替换失败!",show:'alert'});
 	}
 	if($("#btn_copy").length==0){
@@ -417,6 +520,7 @@ _COMMON.prototype.showCopyDialog=function(itemObj){//显示对话框
 	$.Zebra_Dialog(html,{
 		'title': itemObj.title,
 		type:itemObj.rate.use.rate<=10?"error":(itemObj.rate.use.rate<itemObj.yj?"warning":"information"),
+		onClose:function(cuption){$(".copy-co").remove();},
 		width:600,
 		    'buttons':  [
 				{caption: '保存', callback: function() {that.sendToBackground({action:'item_put',val:itemObj}).then(function(re){console.log(re)});return false;}},
@@ -439,7 +543,7 @@ _COMMON.prototype.sendtoqq=function(itemObj){
 	.then(function(re){
 		if(re=="ok"){
 			$("#btn_copy").click();
-			return $.get("http://127.0.0.1:63630/?action=sendToQQ&beforpastedelay="+(500)+"&afterpastedelay="+(500)+"&t="+rndTime)
+			return $.get("http://127.0.0.1:63630/?action=sendToQQ&beforpastedelay="+(500)+"&afterpastedelay="+(itemObj.setup_afterpastedelay*1000)+"&t="+rndTime)
 		}
 		else
 			return re;
@@ -447,7 +551,7 @@ _COMMON.prototype.sendtoqq=function(itemObj){
 	.then(function(re){
 		if(re=="reCopy"){
 			$("#btn_copy").click();
-			return $.get("http://127.0.0.1:63630/?action=sendToQQ&beforpastedelay="+(500)+"&afterpastedelay="+(500)+"&t="+rndTime)							
+			return $.get("http://127.0.0.1:63630/?action=sendToQQ&beforpastedelay="+(500)+"&afterpastedelay="+(itemObj.setup_afterpastedelay*1000)+"&t="+rndTime)							
 		}else
 			return re;
 	})
@@ -537,18 +641,17 @@ function tuiguang(itemObj){
 	.then(function(itemObj){
 		console.log(itemObj);
 		return itemObj;
-	})
-	.fail(function(msg){
+	},function(msg){
 		if(msg.show=='alert')
 			alert(msg.msg);
 		console.log(msg);
+		return msg;
 	});
 }
 function check_collection(msg){//别人QQ群消息提取
 	var _def=$.Deferred();
 	var itemObj={};
 	var $contentEditable;
-	console.clear();
 	if(msg){
 		$contentEditable=$("<div>"+msg+"</div>");
 	}
@@ -582,11 +685,16 @@ function check_collection(msg){//别人QQ群消息提取
 	var arr=text.match(titlereg);
 	itemObj.title=((arr&&arr.length==2&&arr[1])||"");//提取标题
 	$contentEditable.find("img").remove();
-	itemObj.describe=$contentEditable.html().replace(itemObj.itemurl,"AAitemurlAA").replace(itemObj.couponurl,"AAcouponurlAA").replace("<br><br>","").replace(/更多内部优惠券.*/g,"");
+	itemObj.describe=$contentEditable.html().replace(itemObj.itemurl,"AAitemurlAA")
+	.replace(itemObj.couponurl,"AAcouponurlAA")
+	.replace("<br><br>","")
+	.replace(/更多内部优惠券.*/g,"")
+	.replace(/白菜价商品下单步骤.*/g,"");
 	console.log("正在打开淘宝页查询%s真实地址...",itemObj.itemurl);
 	itemObj._trycount=0;
 	getRealurl(itemObj)
 	.then(function(itemObj){
+		itemObj._promiseid&&promiseList.delete(itemObj._promiseid);
 		_def.resolve(itemObj);
 	})
 	.fail(function(msg){
@@ -597,50 +705,58 @@ function check_collection(msg){//别人QQ群消息提取
 	});
 	return _def.promise();
 }
+function getRealurl_notify(message,reFunc){	//标签页网址变动时调用
+	var promiseid=message.promiseid;
+	if(promiseList.state(promiseid)!="pending"){
+		reFunc("ok");
+		return;
+	}
+	var tab=message.tab;
+	var itemObj=message.itemObj;
+	var promiseid=message.promiseid;
+	if(tab.url.indexOf("item.htm?id=")!=-1){
+		itemObj.yj=0;
+		itemObj.itemurl=/http.+?id=\d+/.exec(tab.url)[0]||"";
+		console.log("得到真实链接%s",itemObj.itemurl);
+		itemObj.gid=/[\?|&]id=(\d+)/.exec(itemObj.itemurl)[1]||"";//商品ID
+		console.log("得到商品ID%s",itemObj.gid);
+		common.sendToBackground({"action":"tabs_remove",id:tab.id});//关闭标签页
+		itemObj._promiseid=promiseid;
+		promiseList.resolve(promiseid,itemObj);
+		reFunc("ok");
+	}
+	else if(tab.url.indexOf("error")!=-1){
+		promiseList.reject(promiseid,"网页失效...");
+		console.error("%s网页失效...",tab.url);
+		common.sendToBackground({"action":"tabs_remove",id:tab.id});//关闭标签页
+		reFunc("ok");
+	}
+}
 function getRealurl(itemObj){
 	var _def=$.Deferred();
-	common.sendToBackground({"action":"createTab",data:{url:itemObj.itemurl,active: false}})
+	if(itemObj.itemurl&&itemObj.itemurl.indexOf("http")==-1){
+		return _def.reject("不是淘宝URL");
+	}
+	var callbackObj={
+		action:'getRealurl_notify',//网址变动时通知函数
+		itemObj:itemObj,
+		promiseid:promiseList.add()//绑定promise的id
+	}
+	common.sendToBackground({"action":"createTab",callbackObj:callbackObj,data:{url:itemObj.itemurl,active: false}})
 	.then(function(tab){
-		var timer=setInterval(function(){
-			itemObj._trycount++;
-			console.log("等待淘宝页响应%d秒...",itemObj._trycount);
-			console.log(tab);
-			common.sendToBackground({"action":"tabs_query",data:{index:tab.index}})
-			.then(function(tabs){
-				console.log(tabs[0].url);
-				if(!(tabs instanceof Array)){
-					clearInterval(timer);
-					console.error("后台返回失败...");
-					return _def.reject("后台返回失败...");
-				}
-				if(tabs[0].url.indexOf("item.htm?id=")!=-1){
-					clearInterval(timer);
-					itemObj.yj=0;
-					itemObj.itemurl=/http.+?id=\d+/.exec(tabs[0].url)[0]||"";
-					console.log("得到真实链接%s",itemObj.itemurl);
-					itemObj.gid=/[\?|&]id=(\d+)/.exec(itemObj.itemurl)[1]||"";//商品ID
-					console.log("得到商品ID%s",itemObj.gid);
-					common.sendToBackground({"action":"tabs_remove",id:tabs[0].id});//关闭标签页
-					_def.resolve(itemObj);
-				}
-				else if(tabs instanceof Array&&tabs[0].url.indexOf("error")!=-1){
-					clearInterval(timer);
-					_def.reject("网页失效...");
-					console.error("%s网页失效...",tabs[0].url);
-					common.sendToBackground({"action":"tabs_remove",id:tabs[0].id});//关闭标签页
-				}
-			})
-			if(itemObj._trycount%30==0){
+		console.log(tab);
+		setTimeout(function(){//刷新
+			if(promiseList.state(callbackObj.promiseid)=="pending"){
 				console.log("长时间没响应，刷新页面...");
 				common.sendToBackground({"action":"tabs_reload",id:tab.id});//重读标签页
 			}
-			if(itemObj._trycount%60==0){
-				clearInterval(timer);
-				_def.reject("淘宝页面长时间无响应...");
-				console.error("淘宝页面长时间无响应...");
+		},15*1000)
+		setTimeout(function(){//关闭
+			if(promiseList.state(callbackObj.promiseid)=="pending"){
+				promiseList.reject(callbackObj.promiseid,"长时间没响应，关闭页面...");
 				common.sendToBackground({"action":"tabs_remove",id:tab.id});//关闭标签页
 			}
-		},1000)
+		},30*1000)
 	})
-	return _def.promise();
+	return promiseList.getpromiss(callbackObj.promiseid);
 }

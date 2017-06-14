@@ -1,0 +1,28 @@
+#info {
+        width: 500px;
+    }
+    
+.border-top {
+    border-top: 1px solid #dcdcdc;
+}
+.pading-5{
+    padding: 5px;
+}
+.margin-5{
+        margin: 5px;
+}
+.avatarimg {
+    border: 1px solid #dcdcdc;
+    padding: 5px;
+    height: 164px;
+    width: 164px;
+}
+
+.avatar {
+    max-height: 154px;
+    max-width: 154px;
+}
+
+.input-group-addon {
+    width: 100px;
+}
